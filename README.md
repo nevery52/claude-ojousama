@@ -40,6 +40,10 @@
 需要 **Windows**、**Python 3.10 以上**、**Claude Code**。
 
 ```bash
+git clone https://github.com/nevery52/claude-ojousama.git
+```
+
+```bash
 pip install --user PySide6-Essentials
 ```
 
