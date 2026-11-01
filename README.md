@@ -1,5 +1,7 @@
 # Claude 大小姐
 
+<p align="center"><img src="art/cut/gaze.png" width="260" alt="Claude 大小姐托着下巴看着你"></p>
+
 一个住在 Claude 桌面应用窗口角落的 Q 版小挂件。她会跟着 Claude 的工作状态换表情，告诉你 Claude 正在做什么，还会显示订阅额度。
 
 橙色长发、星芒花发饰和黑缎带、米白荷叶边衬衫、抱着一本书，眼里有星芒高光。
@@ -7,6 +9,10 @@
 > 粉丝自制的非官方作品，和 Anthropic 没有任何关系。「Claude」是 Anthropic 的商标，这里只用来说明它和什么软件一起用。
 
 ## 她会做什么
+
+![全部表情](art/cut_check.png)
+
+<sub>从左到右：待机、眨眼、思考、干活、等你确认、开心 / 累了、睡着、被点到、托腮、托腮眨眼</sub>
 
 **跟着 Claude 的状态换表情**
 
