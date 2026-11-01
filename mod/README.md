@@ -24,7 +24,7 @@ claude-ojousama/
 在 `~/.claude/settings.json` 的 `env` 里加上：
 
 ```json
-"CLAUDE_CODE_PLUGIN_DIRS": "E:\\claude\\claude-ojousama\\mod"
+"CLAUDE_CODE_PLUGIN_DIRS": "D:\\你放项目的地方\\claude-ojousama\\mod"
 ```
 
 之后新开的 Claude Code 会话都会自动加载它。
