@@ -30,8 +30,13 @@ CONFIG = STATE / 'overlay.json'
 
 EXPRESSIONS = ['idle', 'blink', 'think', 'work', 'ask', 'happy', 'tired', 'sleep', 'poke']
 SIZES = {'小': 140, '中': 180, '大': 240}
-DEFAULT_CONFIG = {'size': 180, 'show_quota': True, 'anchor_h': 'right', 'off_h': 16, 'anchor_v': 'bottom', 'off_v': 120}
+DEFAULT_CONFIG = {'size': 180, 'show_quota': True, 'show_bubble': True,
+                  'anchor_h': 'right', 'off_h': 16, 'anchor_v': 'bottom', 'off_v': 120}
 PILL_H = 22
+BUBBLE_H = 32        # 头顶气泡占的高度
+HEAD_TOP = 0.085     # 图片里她的头顶（呆毛尖）离图片上边的比例，各表情在 8%–12% 之间
+BUBBLE_LINGER = 2500       # 一件事做完后，气泡再停留多久（毫秒）
+BUBBLE_DONE_LINGER = 5000  # "做完啦"停留多久
 SNAP = 40            # 离 Claude 窗口边多近会被吸过去（逻辑像素）
 EDGE_GAP = 4         # 吸上去后离边留一点点缝
 HAPPY_SECONDS = 6    # 做完一件事后开心多久
@@ -213,6 +218,7 @@ class Ojousama(QWidget):
 
         self.mood, self.mood_since, self.last_activity = 'idle', 0, 0
         self.rate_limits, self.cost = [], None
+        self.activity = None
         self.shown_name, self.prev_name, self.fade_start = 'idle', 'idle', 0
         self.poke_until = 0
         self.bounce_start = -10
@@ -249,7 +255,13 @@ class Ojousama(QWidget):
 
     def resize_for_config(self):
         size = self.config['size']
-        self.setFixedSize(size, size + (PILL_H + 4 if self.config['show_quota'] else 0))
+        self.setFixedSize(size, self.top_pad() + size + (PILL_H + 4 if self.config['show_quota'] else 0))
+
+    def top_pad(self):
+        # 头顶留给气泡的地方：图片顶上本来就有一截空白，只补不够的部分
+        if not self.config['show_bubble']:
+            return 0
+        return max(0, math.ceil(BUBBLE_H - HEAD_TOP * self.config['size']))
 
     @property
     def hwnd(self):
@@ -445,6 +457,9 @@ class Ojousama(QWidget):
         quota = QAction('显示额度', menu, checkable=True, checked=self.config['show_quota'])
         quota.triggered.connect(lambda checked: self.set_config(show_quota=checked))
         menu.addAction(quota)
+        bubble = QAction('显示气泡（我在做什么）', menu, checkable=True, checked=self.config['show_bubble'])
+        bubble.triggered.connect(lambda checked: self.set_config(show_bubble=checked))
+        menu.addAction(bubble)
         home = QAction('回到右下角', menu)
         home.triggered.connect(lambda: self.set_config(**{k: DEFAULT_CONFIG[k] for k in ('anchor_h', 'off_h', 'anchor_v', 'off_v')}))
         menu.addAction(home)
@@ -497,8 +512,9 @@ class Ojousama(QWidget):
                 best, best_key = {**data, 'mood': mood}, key
         if best:
             self.mood, self.mood_since = best['mood'], best.get('since', 0)
+            self.activity = best.get('activity')
         else:
-            self.mood, self.mood_since = 'idle', 0
+            self.mood, self.mood_since, self.activity = 'idle', 0, None
         self.last_activity = last_activity
         if latest_limits:
             self.rate_limits, self.cost = latest_limits[1], latest_limits[2]
@@ -579,6 +595,7 @@ class Ojousama(QWidget):
             wobble = math.exp(-4 * k) * math.sin(k * math.pi * 3)
             sx, sy = sx + 0.07 * wobble, sy - 0.09 * wobble
         bob = 2 * math.sin(t * 2 * math.pi / 4) if name == 'sleep' else 0
+        p.translate(0, self.top_pad())
         p.save()
         p.translate(size / 2, size)
         p.scale(sx, sy)
@@ -598,7 +615,55 @@ class Ojousama(QWidget):
             self.paint_zzz(p, t, size)
         if self.config['show_quota']:
             self.paint_quota(p, size)
+        p.translate(0, -self.top_pad())
+        if self.config['show_bubble']:
+            self.paint_bubble(p, size)
         p.end()
+
+    def bubble(self):
+        """气泡现在该说什么、有多不透明：工具在跑时一直显示，结束后再停留一会儿，慢慢淡出。"""
+        a = self.activity
+        if not isinstance(a, dict) or not a.get('text'):
+            return None, 0
+        now = time.time() * 1000
+        start, end = a.get('at', 0), a.get('end')
+        fade_in = min((now - start) / 200, 1)
+        if end is None:
+            if self.mood not in ('working', 'asking') or now - start > STALE_MINUTES * 60 * 1000:
+                return None, 0
+            return a['text'], fade_in
+        linger = BUBBLE_DONE_LINGER if a['text'] == '做完啦' else BUBBLE_LINGER
+        left = linger - (now - end)
+        if left <= 0:
+            return None, 0
+        return a['text'], min(fade_in, left / 600, 1)
+
+    def paint_bubble(self, p, size):
+        text, alpha = self.bubble()
+        if not text or alpha <= 0:
+            return
+        p.setOpacity(alpha)
+        p.setFont(QFont('Microsoft YaHei', 9))
+        metrics = p.fontMetrics()
+        text = metrics.elidedText(text, Qt.ElideMiddle, size - 28)
+        width = metrics.horizontalAdvance(text) + 20
+        tip = self.top_pad() + HEAD_TOP * size + 2      # 小尾巴尖正好碰到呆毛
+        rect = QRectF((size - width) / 2, tip - 7 - (BUBBLE_H - 9), width, BUBBLE_H - 9)
+        path = QPainterPath()
+        path.addRoundedRect(rect, 8, 8)
+        tail = QPainterPath()   # 小尾巴指向她的头
+        cx = size / 2 + 6
+        tail.moveTo(cx - 5, rect.bottom() - 1)
+        tail.lineTo(cx + 1, rect.bottom() + 7)
+        tail.lineTo(cx + 5, rect.bottom() - 1)
+        path = path.united(tail)
+        asking = self.mood == 'asking'
+        p.fillPath(path, QColor(255, 252, 247, 245))
+        p.setPen(QPen(QColor(200, 70, 50) if asking else QColor(217, 122, 74), 1.2))
+        p.drawPath(path)
+        p.setPen(QColor(150, 45, 35) if asking else QColor(107, 74, 51))
+        p.drawText(rect, Qt.AlignCenter, text)
+        p.setOpacity(1)
 
     def paint_zzz(self, p, t, size):
         font = QFont('Microsoft YaHei', max(size // 16, 9), QFont.Bold)

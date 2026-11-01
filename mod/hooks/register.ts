@@ -6,6 +6,50 @@ type Mood = 'idle' | 'thinking' | 'working' | 'asking' | 'done' | 'ended'
 // 调用这些工具时，是在等用户回答或拍板：大小姐举手
 const ASKING_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode'])
 
+// 大小姐头顶的气泡：只写事实，Claude 正在做什么
+type Activity = { text: string; at: number; end?: number }
+
+function basename(path: unknown) {
+  return typeof path === 'string' ? path.split(/[\\/]/).pop() || path : ''
+}
+
+function describe(tool: string, input: Record<string, unknown>): string | undefined {
+  const file = basename(input.file_path ?? input.notebook_path ?? input.path)
+  switch (tool) {
+    case 'Read':
+      return file ? `在读 ${file}` : '在读文件'
+    case 'Edit':
+    case 'MultiEdit':
+    case 'NotebookEdit':
+      return file ? `在改 ${file}` : '在改文件'
+    case 'Write':
+      return file ? `在写 ${file}` : '在写文件'
+    case 'Bash':
+    case 'PowerShell':
+      return '在运行命令'
+    case 'Grep':
+      return '在搜索代码'
+    case 'Glob':
+      return '在找文件'
+    case 'WebSearch':
+      return '在上网查资料'
+    case 'WebFetch':
+      return '在看网页'
+    case 'Agent':
+    case 'Task':
+      return '请了个帮手'
+    case 'Skill':
+      return '在翻说明书'
+    case 'AskUserQuestion':
+      return '有问题想问你'
+    case 'ExitPlanMode':
+      return '想请你看看计划'
+  }
+  if (tool.startsWith('mcp__Claude_Browser__') || tool.startsWith('mcp__claude-in-chrome__')) return '在用浏览器'
+  if (tool.startsWith('mcp__ccd_turn__')) return undefined   // 更新任务清单之类，不值得说
+  return '在用工具'
+}
+
 const s = {
   file: undefined as string | undefined,
   launcher: undefined as string | undefined,
@@ -18,6 +62,7 @@ const s = {
   waitingForPerson: new Set<string>(),
   rateLimits: [] as unknown[],
   cost: undefined as number | undefined,
+  activity: undefined as Activity | undefined,
   writing: Promise.resolve() as Promise<void>,
 }
 
@@ -35,8 +80,8 @@ function save($: EngineInterface, next: Mood) {
     s.mood = next
     s.since = Date.now()
   }
-  const { mood, since, rateLimits, cost, cwd, file } = s
-  const text = JSON.stringify({ mood, since, updated: Date.now(), rateLimits, cost, cwd })
+  const { mood, since, rateLimits, cost, cwd, file, activity } = s
+  const text = JSON.stringify({ mood, since, updated: Date.now(), rateLimits, cost, cwd, activity })
   s.writing = s.writing
     .then(() => (file ? $.fs.write(file, text) : undefined))
     .catch(err => $.ui.log(`state write failed: ${String(err)}`, { to: 'debug' }))
@@ -74,6 +119,7 @@ export const register: Register = on => {
   on('turn.start', async ($, e, next) => {
     if (e.agentId === undefined) {
       s.inTurn = true
+      s.activity = undefined
       resetTurn()
       await save($, 'thinking')
     }
@@ -86,6 +132,7 @@ export const register: Register = on => {
     if (verdict.decision === 'ask' && e.tool_use_id && e.agentId === undefined && !ASKING_TOOLS.has(e.tool)) {
       s.waitingForPerson.add(e.tool_use_id)
       s.asking++
+      s.activity = { text: '需要你确认一下', at: Date.now() }
       await refresh($)
     }
     return verdict
@@ -95,10 +142,14 @@ export const register: Register = on => {
     const isAsking = ASKING_TOOLS.has(e.tool) && e.agentId === undefined
     if (isAsking) s.asking++
     else s.tools++
+    const text = describe(e.tool, e as Record<string, unknown>)
+    const activity: Activity | undefined = text ? { text, at: Date.now() } : undefined
+    if (activity && !(s.asking > 0 && !isAsking)) s.activity = activity
     await refresh($)
     try {
       return await next(e)
     } finally {
+      if (activity && s.activity === activity) activity.end = Date.now()
       if (isAsking) s.asking--
       else s.tools--
       if (e.tool_use_id && s.waitingForPerson.delete(e.tool_use_id)) s.asking--
@@ -112,6 +163,8 @@ export const register: Register = on => {
     if (e.agentId === undefined) {
       s.inTurn = false
       resetTurn()
+      const now = Date.now()
+      s.activity = e.isAborted ? undefined : { text: '做完啦', at: now, end: now }
       await save($, e.isAborted ? 'idle' : 'done')
     }
     return next(e)
