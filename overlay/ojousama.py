@@ -42,6 +42,9 @@ ART_BOTTOM = 0.95    # 她身体的底边在图片里的位置，下面约 5% �
 BUBBLE_ERROR_LINGER = 4000   # "出错了"停留多久
 BUBBLE_NIGHT_LINGER = 8000   # 深夜报时停留多久
 GAZE_AFTER = 90      # 多久没动静，她就放下书托着下巴看你（秒）
+AWAY_MINUTES = 10    # 你离开电脑多久（没碰键盘鼠标），回来时她会挥挥手
+WAVE_SECONDS = 2.4   # 挥手多久
+CALM = {'idle', 'gaze', 'sleep'}   # 闲着的姿势，它们之间慢慢过渡
 HISTORY_SHOWN = 6    # 悬停时列出最近几件事
 BUBBLE_LINGER = 2500       # 一件事做完后，气泡再停留多久（毫秒）
 BUBBLE_DONE_LINGER = 5000  # "做完啦"停留多久
@@ -83,6 +86,8 @@ user32.GetWindow.restype = wintypes.HWND
 user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
 user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
 user32.GetCursorPos.argtypes = [ctypes.POINTER(wintypes.POINT)]
+user32.GetLastInputInfo.argtypes = [ctypes.c_void_p]
+kernel32.GetTickCount.restype = wintypes.DWORD
 user32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wintypes.UINT]
 user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
 user32.GetWindowLongPtrW.restype = ctypes.c_ssize_t
@@ -168,6 +173,18 @@ def cursor_pos():
     return p.x, p.y
 
 
+class LASTINPUTINFO(ctypes.Structure):
+    _fields_ = [('cbSize', wintypes.UINT), ('dwTime', wintypes.DWORD)]
+
+
+def idle_ms():
+    """你多久没碰键盘鼠标了（毫秒）。"""
+    info = LASTINPUTINFO(ctypes.sizeof(LASTINPUTINFO), 0)
+    if not user32.GetLastInputInfo(ctypes.byref(info)):
+        return 0
+    return (kernel32.GetTickCount() - info.dwTime) & 0xFFFFFFFF
+
+
 def clean_old_sessions():
     """删掉几天前的会话状态文件，但总留着最新的一个（里面有最后读到的额度）。"""
     files = sorted(SESSIONS.glob('*.json'), key=lambda p: p.stat().st_mtime)
@@ -232,6 +249,7 @@ class Ojousama(QWidget):
         self.activity, self.history = None, None
         self.shown_name, self.prev_name, self.fade_start = 'idle', 'idle', 0
         self.poke_until = 0
+        self.wave_until, self.away, self.returned_at = 0, False, 0
         self.bounce_start = -10
         self.blink_until, self.next_blink = 0, time.monotonic() + 3
         self.drag = None
@@ -311,6 +329,7 @@ class Ojousama(QWidget):
         if self.claude:
             self.missing_since = time.monotonic()
             self.watch_timer.setInterval(500)
+            self.notice_return()
         elif self.config.get('autostart'):
             # 开机就在的大小姐：Claude 没开时藏起来慢慢等，几乎不占资源
             self.watch_timer.setInterval(2000)
@@ -325,6 +344,18 @@ class Ojousama(QWidget):
             self.next_cleanup = time.monotonic() + 600
             clean_old_sessions()
         self.follow()
+
+    def notice_return(self):
+        """你离开了一阵子又回来时，她挥挥手。"""
+        idle = idle_ms()
+        if idle >= AWAY_MINUTES * 60 * 1000:
+            self.away = True
+        elif self.away and idle < 2000:
+            self.away = False
+            if self.isVisible() and self.mood in ('idle', 'done'):   # 在干活、等你确认时不打断
+                self.returned_at = time.time() * 1000   # 你来了，她就醒着，不马上睡回去
+                self.wave_until = time.monotonic() + WAVE_SECONDS
+                self.bounce_start = time.monotonic()
 
     def tick(self):
         if self.isVisible():
@@ -541,6 +572,8 @@ class Ojousama(QWidget):
             return 'poke'
         if self.mood == 'asking':
             return 'ask'
+        if t < self.wave_until:
+            return 'ask'            # 举手那张图，这时是在跟你打招呼
         text, _ = self.bubble()
         if text and self.activity.get('error'):
             return 'tired'          # 出错了：冒汗
@@ -552,7 +585,7 @@ class Ojousama(QWidget):
         if self.mood == 'done' and now - self.mood_since < HAPPY_SECONDS * 1000:
             return 'happy'
         quiet = now - self.last_activity if self.last_activity else 0
-        if quiet > SLEEP_MINUTES * 60 * 1000:
+        if min(quiet, now - self.returned_at) > SLEEP_MINUTES * 60 * 1000:
             return 'sleep'
         if self.is_tired():
             return 'tired'
@@ -634,7 +667,11 @@ class Ojousama(QWidget):
         p.scale(sx, sy)
         p.translate(-size / 2, -foot + bob)
 
-        fade = min((t - self.fade_start) / 0.22, 1)
+        # 换表情时交叉淡化。闲着时换姿势（待机、托腮、睡着）慢一点、柔一点；干活时利落些
+        calm = self.prev_name in CALM and name in CALM
+        fade = min((t - self.fade_start) / (0.8 if calm else 0.22), 1)
+        if calm:
+            fade = fade * fade * (3 - 2 * fade)   # 缓入缓出
         if fade < 1:
             p.setOpacity(1 - fade)
             p.drawPixmap(0, self.lift(self.prev_name), self.pixmap(self.prev_name))

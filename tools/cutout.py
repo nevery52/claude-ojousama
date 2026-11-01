@@ -9,6 +9,8 @@ from collections import deque
 from PIL import Image, ImageFilter
 
 THRESH = 232  # 亮度高于这个、且偏灰白的像素算"白"
+HAIR = 0.35  # 缝隙外圈里橙色头发超过这个比例，就当作头发间露出的背景
+MIN_GAP = 100  # 比这还小的白点不动：多半是花瓣、高光之间的留白，挖掉反而像破洞
 
 
 def is_white(p):
@@ -58,8 +60,8 @@ def hair_ratio(px, W, H, region):
     return sum(is_hair(px[p]) for p in ring) / len(ring) if ring else 0
 
 
-def cutout(src, dst, size=512):
-    im = Image.open(src).convert('RGBA')
+def outline(im):
+    """算出透明遮罩：人物是 255，背景是 0。"""
     W, H = im.size
     px = im.load()
     seen = bytearray(W * H)
@@ -71,7 +73,7 @@ def cutout(src, dst, size=512):
 
     # 只处理靠近外轮廓的缝隙，眼睛里的高光在脸中间，离得远，不会被误删
     near = Image.frombytes('L', (W, H), bytes(255 if v else 0 for v in bg))
-    for _ in range(5):
+    for _ in range(8):
         near = near.filter(ImageFilter.MaxFilter(9))
     near = near.tobytes()
 
@@ -80,19 +82,26 @@ def cutout(src, dst, size=512):
             if seen[y * W + x] or not is_white(px[x, y]):
                 continue
             region = flood(px, W, H, seen, [(x, y)])
-            if any(near[i] for i in region) and hair_ratio(px, W, H, region) > 0.5:
+            if len(region) >= MIN_GAP and any(near[i] for i in region) and hair_ratio(px, W, H, region) > HAIR:
                 for i in region:
                     bg[i] = 1
 
     mask = Image.frombytes('L', (W, H), bytes(0 if v else 255 for v in bg))
     # 收一像素边、再轻微羽化，去掉 JPG 留下的白边
-    mask = mask.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.8))
-    im.putalpha(mask)
+    return mask.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.8))
+
+
+def cutout(src, dst, size=512, like=None):
+    """like：沿用另一张图的轮廓。眨眼图只有眼睛不同，用睁眼图的轮廓，眨眼时边缘就不会跳。"""
+    im = Image.open(src).convert('RGBA')
+    im.putalpha(outline(Image.open(like or src).convert('RGBA')))
     im.thumbnail((size, size), Image.LANCZOS)
     im.save(dst, optimize=True)
 
 
 if __name__ == '__main__':
+    # 用法：cutout.py 原图 输出 [原图 输出 ...]；原图写成 "闭眼.jpg=睁眼.jpg" 表示沿用睁眼图的轮廓
     for src, dst in zip(sys.argv[1::2], sys.argv[2::2]):
-        cutout(src, dst)
+        src, _, like = src.partition('=')
+        cutout(src, dst, like=like or None)
         print('ok', dst)
