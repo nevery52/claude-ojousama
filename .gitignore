@@ -1,0 +1,14 @@
+# 运行时的状态、设置和日志：里面有本机路径，不存进版本里
+state/
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 引擎每次加载插件时自动生成的类型文件
+mod/.claude-plugin/types/
+
+# 系统和编辑器产生的文件
+Thumbs.db
+desktop.ini
+*.log

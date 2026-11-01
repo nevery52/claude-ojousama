@@ -1,0 +1,7 @@
+{
+  "name": "ojousama",
+  "version": "0.1.0",
+  "description": "Claude 大小姐的感知插件：把 Claude 的工作状态和订阅额度写给桌面上的大小姐",
+  "author": { "name": "寻耀" },
+  "license": "MIT"
+}
