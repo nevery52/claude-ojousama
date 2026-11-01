@@ -48,7 +48,7 @@ pip install --user PySide6-Essentials
 ```json
 {
   "env": {
-    "CLAUDE_CODE_PLUGIN_DIRS": "E:\\claude\\claude-ojousama\\mod"
+    "CLAUDE_CODE_PLUGIN_DIRS": "D:\\你放项目的地方\\claude-ojousama\\mod"
   }
 }
 ```
@@ -87,12 +87,19 @@ claude-ojousama/
 python tools/cutout.py 原图.jpg art/cut/idle.png
 ```
 
+闭眼图建议沿用睁眼图的轮廓，眨眼时边缘才不会跳：
+
+```bash
+python tools/cutout.py 闭眼.jpg=睁眼.jpg art/cut/blink.png
+```
+
 换完图要重启大小姐（右键「先休息」，再双击 `overlay/launch.cmd`）。
 
 ## 致谢
 
-形象由用户和 Claude 一起设计，用 GPT 和 Gemini 绘制。灵感来自 DeepSeek 鲸鱼娘挂件和二创圈里大家共创的 Claude 娘形象。
+形象由 寻耀 和 Claude 一起设计，提示词由 Claude 编写，用 GPT 和 Gemini 生成（AI 作图，不是手绘）。灵感来自 DeepSeek 鲸鱼娘挂件和二创圈里大家共创的 Claude 娘形象。
 
 ## 许可
 
-代码 MIT。美术素材仅供个人使用。
+- **代码**：[MIT](LICENSE)。随便用、随便改，注明出处就好。
+- **立绘和表情**（`art/` 文件夹）：[CC BY-NC 4.0](art/LICENSE.md)。可以转发、可以二创，请署名「Claude 大小姐 by 寻耀 & Claude」，**不能用于商业用途**。
