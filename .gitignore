@@ -12,3 +12,6 @@ mod/.claude-plugin/types/
 Thumbs.db
 desktop.ini
 *.log
+
+# 视频成品（太大，不进版本库）
+video/out/
