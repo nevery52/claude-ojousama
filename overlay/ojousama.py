@@ -112,6 +112,7 @@ HWND_TOP = 0
 SWP_NOSIZE, SWP_NOMOVE, SWP_NOZORDER, SWP_NOACTIVATE = 0x1, 0x2, 0x4, 0x10
 DWMWA_EXTENDED_FRAME_BOUNDS = 9
 EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_MINIMIZESTART, EVENT_SYSTEM_MINIMIZEEND = 0x3, 0x16, 0x17
+EVENT_OBJECT_LOCATIONCHANGE, OBJID_WINDOW = 0x800B, 0
 WINEVENT_OUTOFCONTEXT = 0
 
 _exe_cache = {}
@@ -243,6 +244,7 @@ class Ojousama(QWidget):
         self.missing_since = time.monotonic()
         self.ever_found = False
         self.hooks = []
+        self.move_hook, self.move_pid = None, None
 
         self.mood, self.mood_since, self.last_activity = 'idle', 0, 0
         self.rate_limits, self.cost = [], None
@@ -309,6 +311,30 @@ class Ojousama(QWidget):
                             (EVENT_SYSTEM_MINIMIZESTART, EVENT_SYSTEM_MINIMIZEEND)):
             self.hooks.append(user32.SetWinEventHook(first, last, None, self.on_event, 0, 0, WINEVENT_OUTOFCONTEXT))
 
+    def hook_claude_moves(self):
+        """只听 Claude 这一个程序的"位置变了"：窗口一动她就跟上，拖窗口时不会一顿一顿。"""
+        pid = pid_of(self.claude) if self.claude else None
+        if pid == self.move_pid:
+            return
+        if self.move_hook:
+            user32.UnhookWinEvent(self.move_hook)
+            self.move_hook = None
+        self.move_pid = pid
+        if pid:
+            self.on_move = WINEVENTPROC(self.claude_moved)
+            self.move_hook = user32.SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE, None,
+                                                    self.on_move, pid, 0, WINEVENT_OUTOFCONTEXT)
+
+    def claude_moved(self, _hook, _event, hwnd, id_object, _child, _thread, _time):
+        # Claude 打字输出时光标、文字区域也会发这个通知，很多，所以第一步就把它们筛掉
+        if id_object != OBJID_WINDOW or hwnd != self.claude or self.drag:
+            return
+        try:
+            x, y = self.target_position()
+            user32.SetWindowPos(self.hwnd, 0, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE)
+        except Exception:
+            log.exception('move failed')
+
     def win_event(self, _hook, _event, _hwnd, _id_object, _child, _thread, _time):
         try:
             self.follow()
@@ -316,7 +342,7 @@ class Ojousama(QWidget):
             log.exception('follow failed')
 
     def poll_position(self):
-        # Claude 输出文字时会发出大量位置事件，所以不监听，改成每秒查 20 次窗口位置，变了才动
+        # 保险：窗口位置通知万一漏了（比如 Claude 刚重开），每秒再查 20 次，变了才动
         if self.claude and not self.drag:
             self.follow()
 
@@ -326,6 +352,7 @@ class Ojousama(QWidget):
             if self.claude:
                 self.ever_found = True
                 log.info('found Claude window %s', self.claude)
+        self.hook_claude_moves()
         if self.claude:
             self.missing_since = time.monotonic()
             self.watch_timer.setInterval(500)
