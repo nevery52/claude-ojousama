@@ -31,6 +31,7 @@ CONFIG = STATE / 'overlay.json'
 EXPRESSIONS = ['idle', 'blink', 'think', 'work', 'ask', 'happy', 'tired', 'sleep', 'poke']
 OPTIONAL_EXPRESSIONS = ['gaze', 'gaze_blink']    # 托着下巴看着你，和它的闭眼图
 BLINK_OF = {'idle': 'blink', 'gaze': 'gaze_blink'}   # 哪个姿势有对得上的闭眼图
+LIFT = {'gaze': 0.025, 'gaze_blink': 0.025}          # 这些姿势往上提多少（占尺寸的比例）
 SIZES = {'小': 140, '中': 180, '大': 240}
 DEFAULT_CONFIG = {'size': 180, 'show_quota': True, 'show_bubble': True,
                   'anchor_h': 'right', 'off_h': 16, 'anchor_v': 'bottom', 'off_v': 120}
@@ -597,6 +598,10 @@ class Ojousama(QWidget):
             self.pixmaps[name] = p
         return self.pixmaps[name]
 
+    def lift(self, name):
+        # 个别姿势画得高一点，比如托腮时书放得比较低，往上提一点才不会被额度条挡住
+        return round(-LIFT.get(name, 0) * self.config['size'])
+
     def current_frame(self, t):
         name = self.expression()
         if name != self.shown_name:
@@ -632,11 +637,11 @@ class Ojousama(QWidget):
         fade = min((t - self.fade_start) / 0.22, 1)
         if fade < 1:
             p.setOpacity(1 - fade)
-            p.drawPixmap(0, 0, self.pixmap(self.prev_name))
+            p.drawPixmap(0, self.lift(self.prev_name), self.pixmap(self.prev_name))
             p.setOpacity(fade)
         closed = BLINK_OF.get(name)
         shown = closed if closed in self.sources and t < self.blink_until and fade >= 1 else name
-        p.drawPixmap(0, 0, self.pixmap(shown))
+        p.drawPixmap(0, self.lift(shown), self.pixmap(shown))
         p.restore()
         p.setOpacity(1)
 
