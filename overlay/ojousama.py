@@ -29,12 +29,19 @@ SESSIONS = STATE / 'sessions'
 CONFIG = STATE / 'overlay.json'
 
 EXPRESSIONS = ['idle', 'blink', 'think', 'work', 'ask', 'happy', 'tired', 'sleep', 'poke']
+OPTIONAL_EXPRESSIONS = ['gaze', 'gaze_blink']    # 托着下巴看着你，和它的闭眼图
+BLINK_OF = {'idle': 'blink', 'gaze': 'gaze_blink'}   # 哪个姿势有对得上的闭眼图
 SIZES = {'小': 140, '中': 180, '大': 240}
 DEFAULT_CONFIG = {'size': 180, 'show_quota': True, 'show_bubble': True,
                   'anchor_h': 'right', 'off_h': 16, 'anchor_v': 'bottom', 'off_v': 120}
 PILL_H = 22
 BUBBLE_H = 32        # 头顶气泡占的高度
 HEAD_TOP = 0.085     # 图片里她的头顶（呆毛尖）离图片上边的比例，各表情在 8%–12% 之间
+ART_BOTTOM = 0.95    # 她身体的底边在图片里的位置，下面约 5% 是透明空白
+BUBBLE_ERROR_LINGER = 4000   # "出错了"停留多久
+BUBBLE_NIGHT_LINGER = 8000   # 深夜报时停留多久
+GAZE_AFTER = 90      # 多久没动静，她就放下书托着下巴看你（秒）
+HISTORY_SHOWN = 6    # 悬停时列出最近几件事
 BUBBLE_LINGER = 2500       # 一件事做完后，气泡再停留多久（毫秒）
 BUBBLE_DONE_LINGER = 5000  # "做完啦"停留多久
 SNAP = 40            # 离 Claude 窗口边多近会被吸过去（逻辑像素）
@@ -209,6 +216,9 @@ class Ojousama(QWidget):
         self.setAttribute(Qt.WA_AlwaysShowToolTips)
         self.config = {**DEFAULT_CONFIG, **self.load_config()}
         self.sources = {name: QPixmap(str(ART / f'{name}.png')) for name in EXPRESSIONS}
+        for name in OPTIONAL_EXPRESSIONS:   # 有这张图才用
+            if (ART / f'{name}.png').exists():
+                self.sources[name] = QPixmap(str(ART / f'{name}.png'))
         self.pixmaps, self.pixmap_key = {}, None
 
         self.claude = None
@@ -218,7 +228,7 @@ class Ojousama(QWidget):
 
         self.mood, self.mood_since, self.last_activity = 'idle', 0, 0
         self.rate_limits, self.cost = [], None
-        self.activity = None
+        self.activity, self.history = None, None
         self.shown_name, self.prev_name, self.fade_start = 'idle', 'idle', 0
         self.poke_until = 0
         self.bounce_start = -10
@@ -255,7 +265,8 @@ class Ojousama(QWidget):
 
     def resize_for_config(self):
         size = self.config['size']
-        self.setFixedSize(size, self.top_pad() + size + (PILL_H + 4 if self.config['show_quota'] else 0))
+        body = math.ceil(ART_BOTTOM * size)   # 图片底下那截透明空白不占地方
+        self.setFixedSize(size, self.top_pad() + body + (PILL_H + 4 if self.config['show_quota'] else 0))
 
     def top_pad(self):
         # 头顶留给气泡的地方：图片顶上本来就有一截空白，只补不够的部分
@@ -512,9 +523,9 @@ class Ojousama(QWidget):
                 best, best_key = {**data, 'mood': mood}, key
         if best:
             self.mood, self.mood_since = best['mood'], best.get('since', 0)
-            self.activity = best.get('activity')
+            self.activity, self.history = best.get('activity'), best.get('history')
         else:
-            self.mood, self.mood_since, self.activity = 'idle', 0, None
+            self.mood, self.mood_since, self.activity, self.history = 'idle', 0, None, None
         self.last_activity = last_activity
         if latest_limits:
             self.rate_limits, self.cost = latest_limits[1], latest_limits[2]
@@ -529,6 +540,9 @@ class Ojousama(QWidget):
             return 'poke'
         if self.mood == 'asking':
             return 'ask'
+        text, _ = self.bubble()
+        if text and self.activity.get('error'):
+            return 'tired'          # 出错了：冒汗
         if self.mood == 'working':
             return 'work'
         if self.mood == 'thinking':
@@ -536,9 +550,15 @@ class Ojousama(QWidget):
         now = time.time() * 1000
         if self.mood == 'done' and now - self.mood_since < HAPPY_SECONDS * 1000:
             return 'happy'
-        if self.last_activity and now - self.last_activity > SLEEP_MINUTES * 60 * 1000:
+        quiet = now - self.last_activity if self.last_activity else 0
+        if quiet > SLEEP_MINUTES * 60 * 1000:
             return 'sleep'
-        return 'tired' if self.is_tired() else 'idle'
+        if self.is_tired():
+            return 'tired'
+        # 一阵子没动静：放下书，托着下巴静静看着你（有这张图时）
+        if quiet > GAZE_AFTER * 1000 and 'gaze' in self.sources:
+            return 'gaze'
+        return 'idle'
 
     def tooltip(self):
         lines = [f'Claude 大小姐 · {MOOD_NAMES.get(self.mood, self.mood)}']
@@ -550,6 +570,13 @@ class Ojousama(QWidget):
             lines.append(f'最近一次对话花费：${self.cost:.2f}')
         if not self.rate_limits:
             lines.append('额度：还没读到（Claude 回复一次后就有了）')
+        recent = [h for h in (self.history or []) if isinstance(h, dict) and h.get('text')][-HISTORY_SHOWN:]
+        if recent:
+            lines.append('')
+            lines.append('刚才：')
+            for h in recent:
+                at = datetime.fromtimestamp(h.get('at', 0) / 1000).strftime('%H:%M')
+                lines.append(f'{at}  {h["text"]}' + ('  ⚠️ 出错了' if h.get('error') else ''))
         return '\n'.join(lines)
 
     def quota_text(self):
@@ -574,8 +601,8 @@ class Ojousama(QWidget):
         name = self.expression()
         if name != self.shown_name:
             self.prev_name, self.shown_name, self.fade_start = self.shown_name, name, t
-        # 眨眼：只有待机图有对得上的闭眼图
-        if name == 'idle' and t >= self.next_blink:
+        # 眨眼：只有对得上闭眼图的姿势才眨（待机、托腮）
+        if BLINK_OF.get(name) in self.sources and t >= self.next_blink:
             self.blink_until = t + 0.12
             self.next_blink = t + (0.3 if random.random() < 0.25 else random.uniform(2.5, 5.5))
         return name
@@ -597,16 +624,18 @@ class Ojousama(QWidget):
         bob = 2 * math.sin(t * 2 * math.pi / 4) if name == 'sleep' else 0
         p.translate(0, self.top_pad())
         p.save()
-        p.translate(size / 2, size)
+        foot = ART_BOTTOM * size   # 以她身体真正的底边为基准，底边不会跟着呼吸上下飘
+        p.translate(size / 2, foot)
         p.scale(sx, sy)
-        p.translate(-size / 2, -size + bob)
+        p.translate(-size / 2, -foot + bob)
 
         fade = min((t - self.fade_start) / 0.22, 1)
         if fade < 1:
             p.setOpacity(1 - fade)
             p.drawPixmap(0, 0, self.pixmap(self.prev_name))
             p.setOpacity(fade)
-        shown = 'blink' if name == 'idle' and t < self.blink_until and fade >= 1 else name
+        closed = BLINK_OF.get(name)
+        shown = closed if closed in self.sources and t < self.blink_until and fade >= 1 else name
         p.drawPixmap(0, 0, self.pixmap(shown))
         p.restore()
         p.setOpacity(1)
@@ -632,7 +661,14 @@ class Ojousama(QWidget):
             if self.mood not in ('working', 'asking') or now - start > STALE_MINUTES * 60 * 1000:
                 return None, 0
             return a['text'], fade_in
-        linger = BUBBLE_DONE_LINGER if a['text'] == '做完啦' else BUBBLE_LINGER
+        if a.get('error'):
+            linger = BUBBLE_ERROR_LINGER
+        elif '凌晨' in a['text']:
+            linger = BUBBLE_NIGHT_LINGER
+        elif a['text'].startswith('做完啦'):
+            linger = BUBBLE_DONE_LINGER
+        else:
+            linger = BUBBLE_LINGER
         left = linger - (now - end)
         if left <= 0:
             return None, 0
@@ -657,7 +693,7 @@ class Ojousama(QWidget):
         tail.lineTo(cx + 1, rect.bottom() + 7)
         tail.lineTo(cx + 5, rect.bottom() - 1)
         path = path.united(tail)
-        asking = self.mood == 'asking'
+        asking = self.mood == 'asking' or bool(self.activity.get('error'))   # 等你确认、出错：红色
         p.fillPath(path, QColor(255, 252, 247, 245))
         p.setPen(QPen(QColor(200, 70, 50) if asking else QColor(217, 122, 74), 1.2))
         p.drawPath(path)
@@ -679,7 +715,7 @@ class Ojousama(QWidget):
             return
         p.setFont(QFont('Microsoft YaHei', 9))
         width = p.fontMetrics().horizontalAdvance(text) + 18
-        rect = QRectF((size - width) / 2, size + 2, width, PILL_H)
+        rect = QRectF((size - width) / 2, math.ceil(ART_BOTTOM * size) + 2, width, PILL_H)
         path = QPainterPath()
         path.addRoundedRect(rect, PILL_H / 2, PILL_H / 2)
         warn = self.is_tired()

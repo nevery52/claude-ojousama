@@ -7,7 +7,10 @@ type Mood = 'idle' | 'thinking' | 'working' | 'asking' | 'done' | 'ended'
 const ASKING_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode'])
 
 // 大小姐头顶的气泡：只写事实，Claude 正在做什么
-type Activity = { text: string; at: number; end?: number }
+type Activity = { text: string; at: number; end?: number; error?: boolean }
+
+const HISTORY_SIZE = 10        // 悬停时能看到最近几件事
+const NIGHT_NOTE_EVERY = 3600_000   // 深夜报时最多一小时一次
 
 function basename(path: unknown) {
   return typeof path === 'string' ? path.split(/[\\/]/).pop() || path : ''
@@ -63,7 +66,26 @@ const s = {
   rateLimits: [] as unknown[],
   cost: undefined as number | undefined,
   activity: undefined as Activity | undefined,
+  history: [] as Activity[],
+  lastNightNote: 0,
   writing: Promise.resolve() as Promise<void>,
+}
+
+// 气泡显示这件事，并记进"最近做了什么"
+function show(activity: Activity, remember = true) {
+  s.activity = activity
+  if (remember) {
+    s.history.push(activity)
+    if (s.history.length > HISTORY_SIZE) s.history.shift()
+  }
+}
+
+// 做完了。凌晨的话，顺便说一下现在几点（只说时间，一小时最多一次）
+function doneText(now: number) {
+  const hour = new Date(now).getHours()
+  if (hour >= 5 || now - s.lastNightNote < NIGHT_NOTE_EVERY) return '做完啦'
+  s.lastNightNote = now
+  return `做完啦 · 已经凌晨 ${hour} 点了哦`
 }
 
 // 状态文件写在项目文件夹的 state/sessions/ 里，桌面上的小窗口从那里读
@@ -80,8 +102,8 @@ function save($: EngineInterface, next: Mood) {
     s.mood = next
     s.since = Date.now()
   }
-  const { mood, since, rateLimits, cost, cwd, file, activity } = s
-  const text = JSON.stringify({ mood, since, updated: Date.now(), rateLimits, cost, cwd, activity })
+  const { mood, since, rateLimits, cost, cwd, file, activity, history } = s
+  const text = JSON.stringify({ mood, since, updated: Date.now(), rateLimits, cost, cwd, activity, history })
   s.writing = s.writing
     .then(() => (file ? $.fs.write(file, text) : undefined))
     .catch(err => $.ui.log(`state write failed: ${String(err)}`, { to: 'debug' }))
@@ -132,7 +154,7 @@ export const register: Register = on => {
     if (verdict.decision === 'ask' && e.tool_use_id && e.agentId === undefined && !ASKING_TOOLS.has(e.tool)) {
       s.waitingForPerson.add(e.tool_use_id)
       s.asking++
-      s.activity = { text: '需要你确认一下', at: Date.now() }
+      show({ text: '需要你确认一下', at: Date.now() })
       await refresh($)
     }
     return verdict
@@ -142,14 +164,25 @@ export const register: Register = on => {
     const isAsking = ASKING_TOOLS.has(e.tool) && e.agentId === undefined
     if (isAsking) s.asking++
     else s.tools++
+    const isMain = e.agentId === undefined
     const text = describe(e.tool, e as Record<string, unknown>)
     const activity: Activity | undefined = text ? { text, at: Date.now() } : undefined
-    if (activity && !(s.asking > 0 && !isAsking)) s.activity = activity
+    // 帮手（子代理）做的事也显示在气泡里，但"最近做了什么"只记我自己的，免得被刷屏
+    if (activity && !(s.asking > 0 && !isAsking)) show(activity, isMain)
     await refresh($)
+    let failed = false
     try {
-      return await next(e)
+      const ran = await next(e)
+      failed = 'isError' in ran && ran.isError === true
+      return ran
     } finally {
-      if (activity && s.activity === activity) activity.end = Date.now()
+      const now = Date.now()
+      if (activity) {
+        activity.end = now
+        if (failed) activity.error = true
+      }
+      // 出错了也让你看见：气泡如实说，她会冒汗
+      if (failed && isMain) show({ text: '刚才出错了，我在想办法', at: now, end: now, error: true }, false)
       if (isAsking) s.asking--
       else s.tools--
       if (e.tool_use_id && s.waitingForPerson.delete(e.tool_use_id)) s.asking--
@@ -164,7 +197,8 @@ export const register: Register = on => {
       s.inTurn = false
       resetTurn()
       const now = Date.now()
-      s.activity = e.isAborted ? undefined : { text: '做完啦', at: now, end: now }
+      if (e.isAborted) s.activity = undefined
+      else show({ text: doneText(now), at: now, end: now })
       await save($, e.isAborted ? 'idle' : 'done')
     }
     return next(e)
