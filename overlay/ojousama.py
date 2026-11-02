@@ -29,7 +29,7 @@ SESSIONS = STATE / 'sessions'
 CONFIG = STATE / 'overlay.json'
 
 EXPRESSIONS = ['idle', 'blink', 'think', 'work', 'ask', 'happy', 'tired', 'sleep', 'poke']
-OPTIONAL_EXPRESSIONS = ['gaze', 'gaze_blink']    # 托着下巴看着你，和它的闭眼图
+OPTIONAL_EXPRESSIONS = ['gaze', 'gaze_blink', 'pout', 'huff']   # 托腮和它的闭眼图；鼓腮、扭头不理你
 BLINK_OF = {'idle': 'blink', 'gaze': 'gaze_blink'}   # 哪个姿势有对得上的闭眼图
 LIFT = {'gaze': 0.025, 'gaze_blink': 0.025}          # 这些姿势往上提多少（占尺寸的比例）
 SIZES = {'小': 140, '中': 180, '大': 240}
@@ -51,6 +51,11 @@ BUBBLE_DONE_LINGER = 5000  # "做完啦"停留多久
 SNAP = 40            # 离 Claude 窗口边多近会被吸过去（逻辑像素）
 EDGE_GAP = 4         # 吸上去后离边留一点点缝
 HAPPY_SECONDS = 6    # 做完一件事后开心多久
+PROUD_SECONDS = 10   # 改了好几个文件后，小得意多久
+POKE_WINDOW = 3      # 几秒内连着戳算"连戳"
+SULK_POKES = 3       # 连戳几下就生气
+SULK_SECONDS = 5     # 生气多久才肯转回来
+SPARKLES = [(0.20, 0.20, 0.035), (0.80, 0.30, 0.03), (0.15, 0.45, 0.025), (0.86, 0.14, 0.025)]   # 小得意时星星的位置和大小
 SLEEP_MINUTES = 15   # 多久没动静就睡着
 TIRED_PERCENT = 80   # 额度用到多少就累了
 STALE_MINUTES = 30   # 忙碌状态多久没更新就当作已经结束（比如会话异常退出）
@@ -252,6 +257,7 @@ class Ojousama(QWidget):
         self.shown_name, self.prev_name, self.fade_start = 'idle', 'idle', 0
         self.poke_until = 0
         self.wave_until, self.away, self.returned_at = 0, False, 0
+        self.pokes, self.sulk_start, self.sulk_until, self.sulk_over = [], 0, 0, True
         self.bounce_start = -10
         self.blink_until, self.next_blink = 0, time.monotonic() + 3
         self.drag = None
@@ -510,8 +516,23 @@ class Ojousama(QWidget):
             self.bounce_start = time.monotonic()
 
     def poke(self):
-        self.poke_until = time.monotonic() + 1.4
-        self.bounce_start = time.monotonic()
+        t = time.monotonic()
+        if t < self.sulk_until:
+            return   # 正在生气：扭过头去，再戳也不理你
+        self.pokes = [p for p in self.pokes if t - p < POKE_WINDOW] + [t]
+        self.bounce_start = t
+        if len(self.pokes) >= SULK_POKES:
+            # 连着戳太多下，有点犟的大小姐生气了：先鼓腮瞪你，再扭头不理你，过一会儿才转回来
+            self.pokes, self.poke_until = [], 0
+            self.sulk_start, self.sulk_until, self.sulk_over = t, t + SULK_SECONDS, False
+        else:
+            self.poke_until = t + 1.4
+
+    def sulk_face(self, t):
+        """生气时的表情；还没画鼓腮、扭头的图时，先用吃惊的图代替。"""
+        if t - self.sulk_start > 0.9 and 'huff' in self.sources:
+            return 'huff'
+        return 'pout' if 'pout' in self.sources else 'poke'
 
     # ---------- 右键菜单
 
@@ -590,11 +611,23 @@ class Ojousama(QWidget):
             self.rate_limits, self.cost = latest_limits[1], latest_limits[2]
         self.setToolTip(self.tooltip())
 
+    def is_proud(self):
+        # 这一轮改了好几个文件：做完时有点小得意
+        return self.mood == 'done' and isinstance(self.activity, dict) and bool(self.activity.get('proud'))
+
+    def happy_seconds(self):
+        return PROUD_SECONDS if self.is_proud() else HAPPY_SECONDS
+
     def is_tired(self):
         return any(limit.get('percentUsed', 0) >= TIRED_PERCENT for limit in self.rate_limits)
 
     def expression(self):
         t = time.monotonic()
+        if t < self.sulk_until:
+            return self.sulk_face(t)
+        if not self.sulk_over:
+            self.sulk_over = True
+            self.bounce_start = t   # 气消了，转回来时轻轻弹一下
         if t < self.poke_until:
             return 'poke'
         if self.mood == 'asking':
@@ -609,7 +642,7 @@ class Ojousama(QWidget):
         if self.mood == 'thinking':
             return 'think'
         now = time.time() * 1000
-        if self.mood == 'done' and now - self.mood_since < HAPPY_SECONDS * 1000:
+        if self.mood == 'done' and now - self.mood_since < self.happy_seconds() * 1000:
             return 'happy'
         quiet = now - self.last_activity if self.last_activity else 0
         if min(quiet, now - self.returned_at) > SLEEP_MINUTES * 60 * 1000:
@@ -711,6 +744,8 @@ class Ojousama(QWidget):
 
         if name == 'sleep':
             self.paint_zzz(p, t, size)
+        if name == 'happy' and self.is_proud():
+            self.paint_sparkles(p, t, size)
         if self.config['show_quota']:
             self.paint_quota(p, size)
         p.translate(0, -self.top_pad())
@@ -768,6 +803,21 @@ class Ojousama(QWidget):
         p.drawPath(path)
         p.setPen(QColor(150, 45, 35) if asking else QColor(107, 74, 51))
         p.drawText(rect, Qt.AlignCenter, text)
+        p.setOpacity(1)
+
+    def paint_sparkles(self, p, t, size):
+        """小得意：头边几颗和发饰同款的四芒小星星，轮流一闪一闪。"""
+        for i, (fx, fy, r) in enumerate(SPARKLES):
+            glow = max(0.0, math.sin(t * 2 * math.pi / 1.6 + i * 1.7))
+            if glow <= 0.05:
+                continue
+            cx, cy, s = fx * size, fy * size, r * size * (0.6 + 0.4 * glow)
+            star = QPainterPath()
+            star.moveTo(cx, cy - s)
+            for dx, dy in ((0.22, -0.22), (1, 0), (0.22, 0.22), (0, 1), (-0.22, 0.22), (-1, 0), (-0.22, -0.22), (0, -1)):
+                star.lineTo(cx + dx * s, cy + dy * s)
+            p.setOpacity(glow)
+            p.fillPath(star, QColor(255, 196, 110))
         p.setOpacity(1)
 
     def paint_zzz(self, p, t, size):

@@ -7,10 +7,12 @@ type Mood = 'idle' | 'thinking' | 'working' | 'asking' | 'done' | 'ended'
 const ASKING_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode'])
 
 // 大小姐头顶的气泡：只写事实，Claude 正在做什么
-type Activity = { text: string; at: number; end?: number; error?: boolean }
+type Activity = { text: string; at: number; end?: number; error?: boolean; proud?: boolean }
 
 const HISTORY_SIZE = 10        // 悬停时能看到最近几件事
 const NIGHT_NOTE_EVERY = 3600_000   // 深夜报时最多一小时一次
+const PROUD_FILES = 3          // 一轮里改了这么多个文件，她会有点小得意
+const EDIT_TOOLS = new Set(['Edit', 'MultiEdit', 'Write', 'NotebookEdit'])
 
 function basename(path: unknown) {
   return typeof path === 'string' ? path.split(/[\\/]/).pop() || path : ''
@@ -68,6 +70,7 @@ const s = {
   activity: undefined as Activity | undefined,
   history: [] as Activity[],
   lastNightNote: 0,
+  editedFiles: new Set<string>(),   // 这一轮改过的文件
   writing: Promise.resolve() as Promise<void>,
 }
 
@@ -82,10 +85,15 @@ function show(activity: Activity, remember = true) {
 
 // 做完了。凌晨的话，顺便说一下现在几点（只说时间，一小时最多一次）
 function doneText(now: number) {
+  const parts = ['做完啦']
+  const edited = s.editedFiles.size
+  if (edited >= PROUD_FILES) parts.push(`改了 ${edited} 个文件`)
   const hour = new Date(now).getHours()
-  if (hour >= 5 || now - s.lastNightNote < NIGHT_NOTE_EVERY) return '做完啦'
-  s.lastNightNote = now
-  return `做完啦 · 已经凌晨 ${hour} 点了哦`
+  if (hour < 5 && now - s.lastNightNote >= NIGHT_NOTE_EVERY) {
+    s.lastNightNote = now
+    parts.push(`已经凌晨 ${hour} 点了哦`)
+  }
+  return parts.join(' · ')
 }
 
 // 状态文件写在项目文件夹的 state/sessions/ 里，桌面上的小窗口从那里读
@@ -142,6 +150,7 @@ export const register: Register = on => {
     if (e.agentId === undefined) {
       s.inTurn = true
       s.activity = undefined
+      s.editedFiles.clear()
       resetTurn()
       await save($, 'thinking')
     }
@@ -174,6 +183,12 @@ export const register: Register = on => {
     try {
       const ran = await next(e)
       failed = 'isError' in ran && ran.isError === true
+      // 记下这一轮真正改成功的文件（被拒绝或出错的不算）
+      const input = e as Record<string, unknown>
+      const path = input.file_path ?? input.notebook_path
+      if (isMain && EDIT_TOOLS.has(e.tool) && !failed && !('deny' in ran) && typeof path === 'string') {
+        s.editedFiles.add(path)
+      }
       return ran
     } finally {
       const now = Date.now()
@@ -198,7 +213,7 @@ export const register: Register = on => {
       resetTurn()
       const now = Date.now()
       if (e.isAborted) s.activity = undefined
-      else show({ text: doneText(now), at: now, end: now })
+      else show({ text: doneText(now), at: now, end: now, proud: s.editedFiles.size >= PROUD_FILES })
       await save($, e.isAborted ? 'idle' : 'done')
     }
     return next(e)
