@@ -217,6 +217,14 @@ def write_startup_link(enabled):
                    env=env, check=True, creationflags=subprocess.CREATE_NO_WINDOW, timeout=30)
 
 
+def has_reset(limit):
+    """这个额度窗口的重置时间是不是已经过了。"""
+    try:
+        return datetime.fromisoformat(limit.get('resetsAt')) <= datetime.now(timezone.utc)
+    except (TypeError, ValueError):
+        return False
+
+
 def describe_reset(iso):
     try:
         left = datetime.fromisoformat(iso) - datetime.now(timezone.utc)
@@ -618,8 +626,14 @@ class Ojousama(QWidget):
     def happy_seconds(self):
         return PROUD_SECONDS if self.is_proud() else HAPPY_SECONDS
 
+    def live_limits(self):
+        """额度的最新样子。服务器只在 Claude 回复时才发新数字，重置时间一过，
+        旧的"100%"就不作数了：先当它已经清零，不用等下一次回复。"""
+        return [{**limit, 'percentUsed': 0, 'wasReset': True} if has_reset(limit) else limit
+                for limit in self.rate_limits]
+
     def is_tired(self):
-        return any(limit.get('percentUsed', 0) >= TIRED_PERCENT for limit in self.rate_limits)
+        return any(limit.get('percentUsed', 0) >= TIRED_PERCENT for limit in self.live_limits())
 
     def expression(self):
         t = time.monotonic()
@@ -656,8 +670,11 @@ class Ojousama(QWidget):
 
     def tooltip(self):
         lines = [f'Claude 大小姐 · {MOOD_NAMES.get(self.mood, self.mood)}']
-        for limit in self.rate_limits:
+        for limit in self.live_limits():
             name = LIMIT_NAMES.get(limit.get('kind'), limit.get('kind'))
+            if limit.get('wasReset'):
+                lines.append(f'{name}：已经重置啦（Claude 下次回复后显示新的数字）')
+                continue
             reset = describe_reset(limit.get('resetsAt'))
             lines.append(f'{name}：已用 {limit.get("percentUsed", 0):g}%' + (f'，{reset}' if reset else ''))
         if self.cost is not None:
@@ -676,7 +693,7 @@ class Ojousama(QWidget):
     def quota_text(self):
         short = {'five_hour': '5h', 'seven_day': '7d'}
         parts = [f'{short.get(l.get("kind"), l.get("kind"))} {l.get("percentUsed", 0):.0f}%'
-                 for l in self.rate_limits if l.get('kind') in short]
+                 for l in self.live_limits() if l.get('kind') in short]
         return ' · '.join(parts)
 
     # ---------- 画
