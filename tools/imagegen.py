@@ -70,7 +70,7 @@ def request(url, *, headers=None, data=None, timeout=300):
     except urllib.error.URLError as err:
         sys.exit(f'连不上接口：{err.reason}（如果平时要开代理，确认 HTTPS_PROXY 设置了）')
     except (ConnectionError, http.client.HTTPException, TimeoutError) as err:
-        sys.exit(f'连接中途断了：{err!r}（参考图太大或网络不稳，可以缩小参考图再试）')
+        sys.exit(f'连接中途断了：{type(err).__name__}（网络不稳，或者参考图太大；可以稍后重试，或缩小参考图）')
 
 
 def multipart(fields, files):

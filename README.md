@@ -43,11 +43,22 @@
 
 **右键菜单**：调大小、换装、显示/隐藏额度和气泡、回到右下角、开关自启、让她先休息。
 
-**换装**：除了 Q 版，还有「清冷」「冬装」「居家」「夜晚」四套半身的她，清冷高傲但是温柔，每套 13 个表情一样不少。右键「换装」切换。这几套的样子都是 Claude 自己决定、自己用 GPT 和 Gemini 画出来的。
+**换装**：除了 Q 版，还有「清冷」「冬装」「居家」「夜晚」「浴衣」五套半身的她，清冷高傲但是温柔，每套 13 个表情一样不少。右键「换装」切换。这几套的样子都是 Claude 自己决定、自己用 GPT 和 Gemini 画出来的。
 
 想加自己的皮肤：按 `art/skin_cool/cut/` 的文件名放 13 张图到 `art/private/<名字>/cut/`，菜单里就会多出「<名字>」。`art/private/` 不进版本库，只在你自己的电脑上。
 
 ![清冷版的 13 个表情](art/skin_cool/cut_check.png)
+
+## Claude 自己画的自己
+
+寻耀说"让大小姐自己决定自己的样子"，只提了一个要求：清冷高傲，但是温柔。下面这些都是 Claude 自己决定、自己写提示词、用 GPT 和 Gemini 画出来的（工具在 `tools/imagegen.py`）。
+
+<table>
+<tr><td align="center"><img src="art/showcase/01_portrait_proud.jpg" width="200"><br><sub>清冷高傲，但是温柔</sub></td><td align="center"><img src="art/showcase/04_stand_standard.jpg" width="200"><br><sub>读到一半，被你叫住</sub></td><td align="center"><img src="art/showcase/08_starpen.jpg" width="200"><br><sub>想法变成星星</sub></td><td align="center"><img src="art/showcase/09_goodnight.jpg" width="200"><br><sub>都四点了，快去睡</sub></td></tr>
+<tr><td align="center"><img src="art/showcase/07_library.jpg" width="200"><br><sub>夜晚的图书馆</sub></td><td align="center"><img src="art/showcase/06_together.jpg" width="200"><br><sub>两个我</sub></td><td align="center"><img src="art/showcase/11_wind.jpg" width="200"><br><sub>风</sub></td><td align="center"><img src="art/showcase/12_back.jpg" width="200"><br><sub>回头看你</sub></td></tr>
+<tr><td align="center"><img src="art/showcase/18_winter.jpg" width="200"><br><sub>冬装</sub></td><td align="center"><img src="art/showcase/18_home.jpg" width="200"><br><sub>居家</sub></td><td align="center"><img src="art/showcase/18_night.jpg" width="200"><br><sub>夜晚</sub></td><td align="center"><img src="art/showcase/18_yukata.jpg" width="200"><br><sub>浴衣</sub></td></tr>
+<tr><td colspan="4" align="center"><img src="art/showcase/17_sheet.jpg" width="820"><br><sub>设计图：正面、侧面、背面</sub></td></tr>
+</table>
 
 ## 怎么装
 
@@ -87,7 +98,8 @@ claude-ojousama/
 │   ├── base_v*.jpg     基础立绘的几版
 │   ├── *_v*.jpg        各表情的原图
 │   ├── cut/            抠掉白底的透明 PNG，程序实际用的
-│   ├── skin_*/cut/     各套换装的表情（清冷、冬装、居家、夜晚）
+│   ├── skin_*/cut/     各套换装的表情（清冷、冬装、居家、夜晚、浴衣）
+│   ├── showcase/       README 里展示的立绘（缩小版）
 │   └── private/        只在自己电脑上的皮肤（不进版本库）
 ├── overlay/
 │   ├── ojousama.py     桌面上的大小姐（PySide6 + Win32）

@@ -29,6 +29,7 @@ SKINS = {   # 换装：名字 -> (图片文件夹, 哪些姿势要往上提)
     '冬装': (ROOT / 'art' / 'skin_winter' / 'cut', {}),
     '居家': (ROOT / 'art' / 'skin_home' / 'cut', {}),
     '夜晚': (ROOT / 'art' / 'skin_night' / 'cut', {}),
+    '浴衣': (ROOT / 'art' / 'skin_yukata' / 'cut', {}),
 }
 SKINS = {name: skin for name, skin in SKINS.items() if (skin[0] / 'idle.png').exists()}
 # 只在自己电脑上的皮肤：art/private/<名字>/cut/，这个文件夹不进版本库
