@@ -14,6 +14,7 @@
 """
 import argparse
 import base64
+import http.client
 import json
 import mimetypes
 import os
@@ -68,6 +69,8 @@ def request(url, *, headers=None, data=None, timeout=300):
         sys.exit(f'接口返回错误 {err.code}：{body}')
     except urllib.error.URLError as err:
         sys.exit(f'连不上接口：{err.reason}（如果平时要开代理，确认 HTTPS_PROXY 设置了）')
+    except (ConnectionError, http.client.HTTPException, TimeoutError) as err:
+        sys.exit(f'连接中途断了：{err!r}（参考图太大或网络不稳，可以缩小参考图再试）')
 
 
 def multipart(fields, files):

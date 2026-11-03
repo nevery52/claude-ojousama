@@ -19,4 +19,5 @@ video/out/
 # AI 画图的草稿（太多太大，不进版本库）
 art/drafts/
 art/fullbody/
-art/skin_cool/*_src.*
+art/skin_*/*_src.*
+art/private/
