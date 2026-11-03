@@ -23,7 +23,10 @@ from PySide6.QtGui import QAction, QActionGroup, QColor, QFont, QPainter, QPaint
 from PySide6.QtWidgets import QApplication, QMenu, QWidget
 
 ROOT = Path(__file__).resolve().parent.parent
-ART = ROOT / 'art' / 'cut'
+SKINS = {   # 换装：名字 -> (图片文件夹, 哪些姿势要往上提)
+    'Q 版': (ROOT / 'art' / 'cut', {'gaze': 0.025, 'gaze_blink': 0.025}),
+    '清冷': (ROOT / 'art' / 'skin_cool' / 'cut', {}),
+}
 STATE = ROOT / 'state'
 SESSIONS = STATE / 'sessions'
 CONFIG = STATE / 'overlay.json'
@@ -31,9 +34,8 @@ CONFIG = STATE / 'overlay.json'
 EXPRESSIONS = ['idle', 'blink', 'think', 'work', 'ask', 'happy', 'tired', 'sleep', 'poke']
 OPTIONAL_EXPRESSIONS = ['gaze', 'gaze_blink', 'pout', 'huff']   # 托腮和它的闭眼图；鼓腮、扭头不理你
 BLINK_OF = {'idle': 'blink', 'gaze': 'gaze_blink'}   # 哪个姿势有对得上的闭眼图
-LIFT = {'gaze': 0.025, 'gaze_blink': 0.025}          # 这些姿势往上提多少（占尺寸的比例）
 SIZES = {'小': 140, '中': 180, '大': 240}
-DEFAULT_CONFIG = {'size': 180, 'show_quota': True, 'show_bubble': True,
+DEFAULT_CONFIG = {'size': 180, 'show_quota': True, 'show_bubble': True, 'skin': 'Q 版',
                   'anchor_h': 'right', 'off_h': 16, 'anchor_v': 'bottom', 'off_v': 120}
 PILL_H = 22
 BUBBLE_H = 32        # 头顶气泡占的高度
@@ -247,11 +249,8 @@ class Ojousama(QWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setAttribute(Qt.WA_AlwaysShowToolTips)
         self.config = {**DEFAULT_CONFIG, **self.load_config()}
-        self.sources = {name: QPixmap(str(ART / f'{name}.png')) for name in EXPRESSIONS}
-        for name in OPTIONAL_EXPRESSIONS:   # 有这张图才用
-            if (ART / f'{name}.png').exists():
-                self.sources[name] = QPixmap(str(ART / f'{name}.png'))
         self.pixmaps, self.pixmap_key = {}, None
+        self.load_skin()
 
         self.claude = None
         self.missing_since = time.monotonic()
@@ -293,6 +292,22 @@ class Ojousama(QWidget):
             return json.loads(CONFIG.read_text('utf-8'))
         except (OSError, ValueError):
             return {}
+
+    def load_skin(self):
+        if self.config['skin'] not in SKINS:
+            self.config['skin'] = DEFAULT_CONFIG['skin']
+        art, self.lifts = SKINS[self.config['skin']]
+        self.sources = {name: QPixmap(str(art / f'{name}.png')) for name in EXPRESSIONS}
+        for name in OPTIONAL_EXPRESSIONS:   # 有这张图才用
+            if (art / f'{name}.png').exists():
+                self.sources[name] = QPixmap(str(art / f'{name}.png'))
+        self.pixmap_key = None
+
+    def set_skin(self, skin):
+        self.config['skin'] = skin
+        self.save_config()
+        self.load_skin()
+        self.update()
 
     def save_config(self):
         STATE.mkdir(parents=True, exist_ok=True)
@@ -553,7 +568,14 @@ class Ojousama(QWidget):
             action.triggered.connect(lambda _=False, s=size: self.set_config(size=s))
             group.addAction(action)
             size_menu.addAction(action)
-        quota = QAction('显示额度', menu, checkable=True, checked=self.config['show_quota'])
+        skin_menu = menu.addMenu('换装')
+        skins = QActionGroup(skin_menu)
+        for skin in SKINS:
+            action = QAction(skin, skin_menu, checkable=True, checked=self.config['skin'] == skin)
+            action.triggered.connect(lambda _=False, s=skin: self.set_skin(s))
+            skins.addAction(action)
+            skin_menu.addAction(action)
+        quota =QAction('显示额度', menu, checkable=True, checked=self.config['show_quota'])
         quota.triggered.connect(lambda checked: self.set_config(show_quota=checked))
         menu.addAction(quota)
         bubble = QAction('显示气泡（我在做什么）', menu, checkable=True, checked=self.config['show_bubble'])
@@ -710,7 +732,7 @@ class Ojousama(QWidget):
 
     def lift(self, name):
         # 个别姿势画得高一点，比如托腮时书放得比较低，往上提一点才不会被额度条挡住
-        return round(-LIFT.get(name, 0) * self.config['size'])
+        return round(-self.lifts.get(name, 0) * self.config['size'])
 
     def current_frame(self, t):
         name = self.expression()
