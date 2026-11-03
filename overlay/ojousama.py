@@ -40,7 +40,7 @@ CONFIG = STATE / 'overlay.json'
 EXPRESSIONS = ['idle', 'blink', 'think', 'work', 'ask', 'happy', 'tired', 'sleep', 'poke']
 OPTIONAL_EXPRESSIONS = ['gaze', 'gaze_blink', 'pout', 'huff']   # 托腮和它的闭眼图；鼓腮、扭头不理你
 BLINK_OF = {'idle': 'blink', 'gaze': 'gaze_blink'}   # 哪个姿势有对得上的闭眼图
-SIZES = {'小': 140, '中': 180, '大': 240}
+SIZES = {'小': 140, '中': 180, '大': 240, '特大': 360}   # 特大适合全身的皮肤
 DEFAULT_CONFIG = {'size': 180, 'show_quota': True, 'show_bubble': True, 'skin': 'Q 版',
                   'anchor_h': 'right', 'off_h': 16, 'anchor_v': 'bottom', 'off_v': 120}
 PILL_H = 22

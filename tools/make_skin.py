@@ -6,6 +6,7 @@
   python tools/make_skin.py cut   <皮肤文件夹>              抠图，输出到 <文件夹>/cut/，再拼一张 cut_check.png
 
 表情的提示词在 art/drafts/prompts/skin/，和清冷版共用。
+底图是竖的（全身）时，Gemini 按 2:3 改图，抠图用普通的四边泛洪，再把整个人放进方形画框。
 gaze_blink 是在 gaze 上闭眼，blink 和 gaze_blink 抠图时沿用睁眼图的轮廓，眨眼时边缘不会跳。
 Gemini 偶尔超时（503，不收费），每张最多重试 3 次。
 """
@@ -25,14 +26,20 @@ EDITS = [n for n in NAMES if n not in ('idle', 'gaze_blink')]
 LIKE = {'blink': 'idle', 'gaze_blink': 'gaze'}
 
 
+def is_full(folder):
+    w, h = Image.open(folder / 'idle_src.png').size
+    return h > w * 1.2
+
+
 def edit(folder, name):
     ref = folder / ('gaze_src.jpg' if name == 'gaze_blink' else 'idle_src.png')
+    aspect = '2:3' if is_full(folder) else '1:1'
     tag = f'{folder.name}_{name}'
     own = folder / 'prompts' / f'{name}.txt'   # 这套皮肤自己的表情提示词
     prompt = own if own.exists() else PROMPTS / f'{name}.txt'
     for attempt in range(3):
         r = subprocess.run([sys.executable, str(ROOT / 'tools' / 'imagegen.py'), 'gemini', '--model', 'gemini-3-pro-image',
-                            '--aspect', '1:1', '--image-size', '2K', '--prompt-file', str(prompt),
+                            '--aspect', aspect, '--image-size', '2K', '--prompt-file', str(prompt),
                             '--ref', str(ref), '--tag', tag], capture_output=True, text=True, encoding='utf-8')
         saved = [line.split(' ', 1)[1] for line in r.stdout.splitlines() if line.startswith('saved ')]
         if saved:
@@ -51,13 +58,27 @@ def faces(folder, names):
         print(edit(folder, 'gaze_blink'), flush=True)
 
 
+def cut_full(src, dst, like=None, out=512, top=0.02, bottom=0.95):
+    """全身图：整个人都在白底上，四边泛洪抠图，再按高度放进方形画框，脚底在 95% 的位置。"""
+    import cutout
+    work = lambda p: Image.open(p).convert('RGBA').resize((683, 1024), Image.LANCZOS)
+    im = work(src)
+    im.putalpha(cutout.outline(work(like or src)))
+    h = round(out * (bottom - top))
+    im = im.resize((round(h * im.width / im.height), h), Image.LANCZOS)
+    canvas = Image.new('RGBA', (out, out), (0, 0, 0, 0))
+    canvas.paste(im, ((out - im.width) // 2, round(out * bottom) - h), im)
+    canvas.save(dst, optimize=True)
+
+
 def cut(folder):
     sys.path.insert(0, str(ROOT / 'tools'))
     import cutout_bust
     (folder / 'cut').mkdir(exist_ok=True)
     src = lambda n: folder / ('idle_src.png' if n == 'idle' else f'{n}_src.jpg')
+    one = cut_full if is_full(folder) else cutout_bust.cutout
     for n in NAMES:
-        cutout_bust.cutout(str(src(n)), str(folder / 'cut' / f'{n}.png'), str(src(LIKE[n])) if n in LIKE else None)
+        one(str(src(n)), str(folder / 'cut' / f'{n}.png'), str(src(LIKE[n])) if n in LIKE else None)
     sheet = Image.new('RGB', (7 * 260, 2 * 270), (40, 44, 52))
     for i, n in enumerate(NAMES):
         im = Image.open(folder / 'cut' / f'{n}.png').resize((256, 256))
