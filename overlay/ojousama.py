@@ -7,6 +7,7 @@
 """
 import ctypes
 import json
+import re
 import logging
 import math
 import os
@@ -39,7 +40,7 @@ SESSIONS = STATE / 'sessions'
 CONFIG = STATE / 'overlay.json'
 
 EXPRESSIONS = ['idle', 'blink', 'think', 'work', 'ask', 'happy', 'tired', 'sleep', 'poke']
-OPTIONAL_EXPRESSIONS = ['gaze', 'gaze_blink', 'pout', 'huff']   # 托腮和它的闭眼图；鼓腮、扭头不理你
+OPTIONAL_EXPRESSIONS = ['gaze', 'gaze_blink', 'pout', 'huff', 'welcome']   # 托腮和它的闭眼图；鼓腮、扭头不理你；你回来时
 BLINK_OF = {'idle': 'blink', 'gaze': 'gaze_blink'}   # 哪个姿势有对得上的闭眼图
 SIZES = {'小': 140, '中': 180, '大': 240, '特大': 360}   # 特大适合全身的皮肤
 DEFAULT_CONFIG = {'size': 180, 'show_quota': True, 'show_bubble': True, 'skin': 'Q 版',
@@ -304,6 +305,10 @@ class Ojousama(QWidget):
         if self.config['skin'] not in SKINS:
             self.config['skin'] = DEFAULT_CONFIG['skin']
         art, self.lifts = SKINS[self.config['skin']]
+        try:   # 这套皮肤自己的台词（可选）：和 cut/ 同级的 lines.json
+            self.lines = json.loads((art.parent / 'lines.json').read_text('utf-8'))
+        except (OSError, ValueError):
+            self.lines = {}
         self.sources = {name: QPixmap(str(art / f'{name}.png')) for name in EXPRESSIONS}
         for name in OPTIONAL_EXPRESSIONS:   # 有这张图才用
             if (art / f'{name}.png').exists():
@@ -675,8 +680,8 @@ class Ojousama(QWidget):
             return 'poke'
         if self.mood == 'asking':
             return 'ask'
-        if t < self.wave_until:
-            return 'ask'            # 举手那张图，这时是在跟你打招呼
+        if t < self.wave_until:     # 跟你打招呼：有专门的图就用它，没有就用举手那张
+            return 'welcome' if 'welcome' in self.sources else 'ask'
         text, _ = self.bubble()
         if text and self.activity.get('error'):
             return 'tired'          # 出错了：冒汗
@@ -801,6 +806,11 @@ class Ojousama(QWidget):
 
     def bubble(self):
         """气泡现在该说什么、有多不透明：工具在跑时一直显示，结束后再停留一会儿，慢慢淡出。"""
+        t = time.monotonic()
+        if t < self.sulk_until and self.lines.get('sulk'):   # 皮肤自己的台词：生气、你回来时
+            return self.lines['sulk'], 1
+        if t < self.wave_until and self.lines.get('welcome'):
+            return self.lines['welcome'], 1
         a = self.activity
         if not isinstance(a, dict) or not a.get('text'):
             return None, 0
@@ -810,7 +820,7 @@ class Ojousama(QWidget):
         if end is None:
             if self.mood not in ('working', 'asking') or now - start > STALE_MINUTES * 60 * 1000:
                 return None, 0
-            return a['text'], fade_in
+            return self.skin_text(a), fade_in
         if a.get('error'):
             linger = BUBBLE_ERROR_LINGER
         elif '凌晨' in a['text']:
@@ -822,7 +832,23 @@ class Ojousama(QWidget):
         left = linger - (now - end)
         if left <= 0:
             return None, 0
-        return a['text'], min(fade_in, left / 600, 1)
+        return self.skin_text(a), min(fade_in, left / 600, 1)
+
+    def skin_text(self, a):
+        """换成这套皮肤的说法；没有台词的皮肤照旧只说事实。"""
+        text, lines = a['text'], self.lines
+        if not lines:
+            return text
+        if a.get('error') and lines.get('error'):
+            return lines['error']
+        if self.mood == 'asking' and a.get('end') is None and lines.get('asking'):
+            return lines['asking']
+        if text.startswith('做完啦') and lines.get('done'):
+            text = text.replace('做完啦', lines['done'], 1)
+        night = re.search(r'已经凌晨 (\d+) 点了哦', text)
+        if night and lines.get('night'):
+            text = text.replace(night.group(0), lines['night'].format(hour=night.group(1)))
+        return text
 
     def paint_bubble(self, p, size):
         text, alpha = self.bubble()

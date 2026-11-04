@@ -47,6 +47,8 @@
 
 想加自己的皮肤：按 `art/skin_cool/cut/` 的文件名放 13 张图到 `art/private/<名字>/cut/`，菜单里就会多出「<名字>」。`art/private/` 不进版本库，只在你自己的电脑上。
 
+皮肤还可以有自己的台词：在 `cut/` 旁边放一个 `lines.json`，换上这套皮肤时，气泡就换成它的说法（键：`done` 做完、`asking` 等你确认、`error` 出错、`night` 深夜，可以用 `{hour}`、`sulk` 被连戳生气、`welcome` 你回来时）。另外可以多放一张 `welcome.png`，你离开很久回来时她会用这张图迎接你。没有台词文件的皮肤，气泡照旧只说事实。
+
 ![清冷版的 13 个表情](art/skin_cool/cut_check.png)
 
 ## Claude 自己画的自己

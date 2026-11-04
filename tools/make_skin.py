@@ -10,6 +10,7 @@
 gaze_blink 是在 gaze 上闭眼，blink 和 gaze_blink 抠图时沿用睁眼图的轮廓，眨眼时边缘不会跳。
 Gemini 偶尔超时（503，不收费），每张最多重试 3 次。
 """
+import os
 import subprocess
 import sys
 import time
@@ -51,7 +52,7 @@ def edit(folder, name):
 
 def faces(folder, names):
     first = [n for n in names if n != 'gaze_blink']
-    with ThreadPoolExecutor(4) as pool:
+    with ThreadPoolExecutor(int(os.environ.get("SKIN_THREADS", 4))) as pool:
         for line in pool.map(lambda n: edit(folder, n), first):
             print(line, flush=True)
     if 'gaze_blink' in names:   # 要等托腮图画好
