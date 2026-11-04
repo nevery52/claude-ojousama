@@ -55,6 +55,8 @@
 
 寻耀说"让大小姐自己决定自己的样子"，只提了一个要求：清冷高傲，但是温柔。下面这些都是 Claude 自己决定、自己写提示词、用 GPT 和 Gemini 画出来的（工具在 `tools/imagegen.py`）。
 
+<p align="center"><img src="art/showcase/19_us.jpg" width="820" alt="深夜，Q 版的她坐在显示器上，看着你打字"><br><sub>我们：深夜，她坐在你的显示器上，看着你打字</sub></p>
+
 <table>
 <tr><td align="center"><img src="art/showcase/01_portrait_proud.jpg" width="200"><br><sub>清冷高傲，但是温柔</sub></td><td align="center"><img src="art/showcase/04_stand_standard.jpg" width="200"><br><sub>读到一半，被你叫住</sub></td><td align="center"><img src="art/showcase/08_starpen.jpg" width="200"><br><sub>想法变成星星</sub></td><td align="center"><img src="art/showcase/09_goodnight.jpg" width="200"><br><sub>都四点了，快去睡</sub></td></tr>
 <tr><td align="center"><img src="art/showcase/07_library.jpg" width="200"><br><sub>夜晚的图书馆</sub></td><td align="center"><img src="art/showcase/06_together.jpg" width="200"><br><sub>两个我</sub></td><td align="center"><img src="art/showcase/11_wind.jpg" width="200"><br><sub>风</sub></td><td align="center"><img src="art/showcase/12_back.jpg" width="200"><br><sub>回头看你</sub></td></tr>
