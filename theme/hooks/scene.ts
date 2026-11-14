@@ -176,7 +176,30 @@ function desk(time: TimeOfDay, p: (typeof PALETTE)['day']): string {
       <path d="M96,-60 L96,-18 L100,-12" stroke="#e3843f" stroke-width="3" fill="none"/>
       <path class="anim breathe" d="${star(101, -6, 7)}" fill="#f6cf62"/>
     </g>
-    ${mug}`
+    ${mug}
+    ${cat(time)}`
+}
+
+// 书桌上蜷着的小猫（Carbon 和 Argon 不约而同都想要一只）：灰白色，尾巴慢慢摆；白天睁一只眼，晚上和凌晨睡着
+function cat(time: TimeOfDay): string {
+  const awake = time === 'day'
+  const eye = awake
+    ? `<ellipse cx="-27" cy="-25" rx="2.2" ry="2.6" fill="#3a3a44"/>`
+    : `<path d="M-30,-25 q3,2.5 6,0" stroke="#3a3a44" stroke-width="1.6" fill="none" stroke-linecap="round"/>`
+  return `
+  <g transform="translate(420 772)">
+    <path class="anim tail" d="M26,-8 C46,-8 52,-26 40,-34" stroke="#b9b6bf" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <ellipse cx="6" cy="-14" rx="30" ry="15" fill="#d6d3da"/>
+    <ellipse cx="10" cy="-9" rx="20" ry="6" fill="#ece9ee"/>
+    <circle cx="-24" cy="-22" r="13" fill="#d6d3da"/>
+    <path d="M-34,-30 L-33,-44 L-25,-34 Z M-20,-34 L-12,-44 L-12,-30 Z" fill="#d6d3da"/>
+    <path d="M-32,-32 L-31.5,-40 L-27,-34 Z M-18,-34 L-14,-40 L-14,-32 Z" fill="#f2c6c6"/>
+    ${eye}
+    <path d="M-20,-25 q3,2.5 6,0" stroke="#3a3a44" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="${awake ? 0 : 1}"/>
+    ${awake ? `<ellipse cx="-17" cy="-25" rx="2.2" ry="2.6" fill="#3a3a44"/>` : ''}
+    <circle cx="-22" cy="-19" r="1.3" fill="#e8a2a2"/>
+    <g class="anim breathe-cat"><ellipse cx="6" cy="-14" rx="30" ry="15" fill="none"/></g>
+  </g>`
 }
 
 function shelf(time: TimeOfDay, p: (typeof PALETTE)['day']): string {
@@ -205,6 +228,8 @@ const STYLE = `
   @keyframes st { 0%,100% { opacity: .15; transform: translateY(0); } 50% { opacity: .6; transform: translateY(-4px); } }
   .zz { animation: zz 4s ease-in-out infinite; }
   @keyframes zz { 0%,100% { opacity: .3; } 50% { opacity: .9; } }
+  .tail { animation: ta 6s ease-in-out infinite; transform-box: view-box; transform-origin: 446px 764px; }
+  @keyframes ta { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-14deg); } }
   .sway { animation: sw 8s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
   @keyframes sw { 0%,100% { transform: rotate(-2.5deg); } 50% { transform: rotate(2.5deg); } }
   .meteor { opacity: 0; animation: me 75s linear infinite; animation-delay: -20s; }
