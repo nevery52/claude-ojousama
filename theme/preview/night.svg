@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+  <style>
+  .anim { animation-play-state: running; }
+  .twinkle { animation: tw 7s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .t1 { animation-delay: -1.8s; } .t2 { animation-delay: -3.6s; } .t3 { animation-delay: -5.1s; }
+  @keyframes tw { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+  .breathe { animation: br 5s ease-in-out infinite; }
+  @keyframes br { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  .halo { animation: ha 9s ease-in-out infinite; }
+  @keyframes ha { 0%,100% { opacity: .8; } 50% { opacity: 1; } }
+  .steam { animation: st 6s ease-in-out infinite; }
+  .s2 { animation-delay: -3s; }
+  @keyframes st { 0%,100% { opacity: .15; transform: translateY(0); } 50% { opacity: .6; transform: translateY(-4px); } }
+  .zz { animation: zz 4s ease-in-out infinite; }
+  @keyframes zz { 0%,100% { opacity: .3; } 50% { opacity: .9; } }
+  .sway { animation: sw 8s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+  @keyframes sw { 0%,100% { transform: rotate(-2.5deg); } 50% { transform: rotate(2.5deg); } }
+  .meteor { opacity: 0; animation: me 75s linear infinite; animation-delay: -20s; }
+  .m2 { animation-duration: 110s; animation-delay: -70s; }
+  @keyframes me {
+    0%, 96% { opacity: 0; transform: translate(290px, 150px); }
+    96.4% { opacity: 1; }
+    98.6% { opacity: 0; transform: translate(470px, 215px); }
+    100% { opacity: 0; transform: translate(470px, 215px); }
+  }
+  .quiet .anim { animation-play-state: paused; }
+  .welcome .flash { animation: fl 3s ease-out 1 forwards; }
+  @keyframes fl { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; } }
+  .welcome .breathe { animation: br 0.7s ease-in-out 4; }
+  @media (prefers-reduced-motion: reduce) { .anim, .flash { animation: none !important; } }
+
+  @media (prefers-color-scheme: light) {
+    .w0 { stop-color: #efe7da; } .w1 { stop-color: #e7ddcd; }
+    .wd { fill: #c7a27c; } .wdd { fill: #a7835f; }
+  }
+</style>
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1">
+      <stop class="w0" offset="0" stop-color="#1a2133"/><stop class="w1" offset="1" stop-color="#141a28"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#wall)"/>
+  <svg x="0" y="0" width="100%" height="100%" viewBox="-560 -440 1270 1520" preserveAspectRatio="xMaxYMid meet">
+    <g class="" opacity="0.42">
+      
+    <defs>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#0f1626"/><stop offset="1" stop-color="#24304a"/>
+      </linearGradient>
+      <clipPath id="pane"><rect x="240" y="120" width="290" height="350" rx="6"/></clipPath>
+    </defs>
+    <rect x="240" y="120" width="290" height="350" rx="6" fill="url(#sky)"/>
+    <g clip-path="url(#pane)"><path class="anim twinkle t0" d="M270.0,163.6L271.7,167.7L276.1,168.0L272.7,170.9L273.8,175.2L270.0,172.9L266.2,175.2L267.3,170.9L263.9,168.0L268.3,167.7Z" fill="#f7e7b8"/><path class="anim twinkle t1" d="M330.0,225.8L331.1,228.5L334.0,228.7L331.8,230.6L332.4,233.4L330.0,231.9L327.6,233.4L328.2,230.6L326.0,228.7L328.9,228.5Z" fill="#f7e7b8"/><path class="anim twinkle t2" d="M390.0,144.9L391.4,148.1L394.9,148.4L392.2,150.7L393.0,154.1L390.0,152.3L387.0,154.1L387.8,150.7L385.1,148.4L388.6,148.1Z" fill="#f7e7b8"/><path class="anim twinkle t3" d="M470.0,256.2L471.0,258.6L473.7,258.8L471.6,260.5L472.3,263.1L470.0,261.7L467.7,263.1L468.4,260.5L466.3,258.8L469.0,258.6Z" fill="#f7e7b8"/><path class="anim twinkle t0" d="M300.0,316.5L300.9,318.7L303.3,318.9L301.5,320.5L302.1,322.8L300.0,321.6L297.9,322.8L298.5,320.5L296.7,318.9L299.1,318.7Z" fill="#f7e7b8"/><path class="anim twinkle t1" d="M500.0,175.2L501.3,178.3L504.6,178.5L502.1,180.7L502.8,183.9L500.0,182.2L497.2,183.9L497.9,180.7L495.4,178.5L498.7,178.3Z" fill="#f7e7b8"/><path class="anim twinkle t2" d="M360.0,376.8L360.8,378.8L363.0,379.0L361.4,380.4L361.9,382.6L360.0,381.4L358.1,382.6L358.6,380.4L357.0,379.0L359.2,378.8Z" fill="#f7e7b8"/><g class="anim meteor"><path d="M0,0 L-46,-16" stroke="#fff6dc" stroke-width="2.4" stroke-linecap="round"/><circle r="2.2" fill="#fffbe9"/></g><g class="anim meteor m2"><path d="M0,0 L-34,-12" stroke="#fff6dc" stroke-width="1.8" stroke-linecap="round"/><circle r="1.7" fill="#fffbe9"/></g></g>
+    <rect x="240" y="120" width="290" height="350" rx="6" fill="none" stroke="#3a4560" stroke-width="10"/>
+    <path d="M385,120 V470 M240,295 H530" stroke="#3a4560" stroke-width="6"/>
+    <rect x="226" y="466" width="318" height="12" rx="4" fill="#3a4560"/>
+      
+    <g>
+      <rect x="40" y="392" width="170" height="10" rx="3" fill="#4a3d36"/>
+      <rect x="40" y="532" width="170" height="10" rx="3" fill="#4a3d36"/>
+      <rect x="40" y="672" width="170" height="10" rx="3" fill="#4a3d36"/>
+      <rect x="52" y="479" width="13" height="53" rx="2" fill="#c98b5a"/><rect x="67" y="466" width="20" height="66" rx="2" fill="#5d6f8a"/><rect x="89" y="475" width="18" height="57" rx="2" fill="#a8654a"/><rect x="109" y="462" width="16" height="70" rx="2" fill="#7a8a6a"/><rect x="127" y="471" width="14" height="61" rx="2" fill="#d9b07a"/><rect x="143" y="480" width="12" height="52" rx="2" fill="#6a5a7a"/><rect x="157" y="467" width="19" height="65" rx="2" fill="#8a5a3a"/><rect x="178" y="476" width="17" height="56" rx="2" fill="#c98b5a"/>
+      <rect x="50" y="616" width="16" height="56" rx="2" fill="#7a8a6a"/><rect x="68" y="603" width="14" height="69" rx="2" fill="#d9b07a"/><rect x="84" y="612" width="12" height="60" rx="2" fill="#6a5a7a"/><rect x="98" y="599" width="19" height="73" rx="2" fill="#8a5a3a"/><rect x="119" y="608" width="17" height="64" rx="2" fill="#c98b5a"/><rect x="138" y="617" width="15" height="55" rx="2" fill="#5d6f8a"/><rect x="155" y="604" width="13" height="68" rx="2" fill="#a8654a"/>
+      
+  <g transform="translate(122 392) scale(1.55)">
+   <g class="anim sway">
+    <g transform="">
+      <!-- 后面的头发（毛线） -->
+      <path d="M-24,-56 C-26,-84 26,-84 24,-56 L26,-14 C18,-8 12,-16 10,-22 L-10,-22 C-12,-16 -18,-8 -26,-14 Z" fill="#e3843f"/>
+      <path d="M-22,-40 q-3,10 0,20 M22,-40 q3,10 0,20" stroke="#c96d2f" stroke-width="1.6" fill="none"/>
+      <!-- 身体：米白荷叶边衬衫 -->
+      <rect x="-17" y="-30" width="34" height="30" rx="13" fill="#f7efe3" stroke="#d8c6ae" stroke-width="1"/>
+      <path d="M-9,-29 q4.5,5 9,0 q4.5,5 9,0" stroke="#d8c6ae" stroke-width="1" fill="none"/>
+      <!-- 抱着的小书，书签垂下来 -->
+      <rect x="-11" y="-21" width="22" height="15" rx="2" fill="#8a5a3a"/>
+      <path d="M4,-6 L4,4" stroke="#e3843f" stroke-width="1.6"/>
+      <path class="anim breathe" d="M4.0,3.3L4.8,5.3L7.0,5.5L5.4,6.9L5.9,9.1L4.0,7.9L2.1,9.1L2.6,6.9L1.0,5.5L3.2,5.3Z" fill="#f6cf62"/>
+      <!-- 脸 -->
+      <circle cx="0" cy="-52" r="19" fill="#fde7d6"/>
+      <!-- 刘海 -->
+      <path d="M-19,-56 C-16,-74 16,-74 19,-56 C12,-62 6,-58 2,-64 C-2,-58 -10,-62 -19,-56 Z" fill="#ea8c45"/>
+      <circle cx="-7" cy="-51" r="2.8" fill="#3a2a22"/><circle cx="7" cy="-51" r="2.8" fill="#3a2a22"/>
+      <ellipse cx="-11" cy="-45" rx="3.2" ry="1.8" fill="#f4b4a2" opacity="0.7"/>
+      <ellipse cx="11" cy="-45" rx="3.2" ry="1.8" fill="#f4b4a2" opacity="0.7"/>
+      <!-- 星芒花发夹（她的左边 = 画面右边） -->
+      <path d="M16.0,-74.0L17.6,-70.2L21.7,-69.9L18.6,-67.2L19.5,-63.1L16.0,-65.3L12.5,-63.1L13.4,-67.2L10.3,-69.9L14.4,-70.2Z" fill="#f6cf62" stroke="#e0a83a" stroke-width="0.8"/>
+      <!-- 黑缎带 -->
+      <path d="M-20,-66 l-8,-5 l1,10 Z M-20,-66 l-9,4 l8,5 Z" fill="#2a2326"/>
+      <circle cx="-20" cy="-66" r="2" fill="#2a2326"/>
+    </g>
+   </g>
+    
+  </g>
+    </g>
+      
+    <!-- 桌面 -->
+    <rect class="wd" x="40" y="772" width="600" height="18" rx="4" fill="#4a3d36"/>
+    <rect class="wdd" x="60" y="790" width="560" height="220" fill="#382e29" opacity="0.6"/>
+    <!-- 台灯 -->
+    <g transform="translate(500 772)">
+      <defs>
+        <radialGradient id="halo"><stop offset="0" stop-color="#ffc478" stop-opacity="0.32"/><stop offset="1" stop-color="#ffc478" stop-opacity="0"/></radialGradient>
+        <radialGradient id="flash"><stop offset="0" stop-color="#ffd59a" stop-opacity="0.75"/><stop offset="1" stop-color="#ffd59a" stop-opacity="0"/></radialGradient>
+      </defs>
+      <ellipse class="anim halo" cx="-10" cy="-120" rx="230" ry="190" fill="url(#halo)"/>
+      <ellipse class="flash" cx="-10" cy="-120" rx="260" ry="220" fill="url(#flash)" opacity="0"/>
+      <rect x="-26" y="-8" width="52" height="8" rx="3" fill="#e8dccb" opacity="0.5"/>
+      <path d="M0,-8 L-30,-110 L-6,-150" stroke="#e8dccb" stroke-width="5" fill="none" opacity="0.55" stroke-linecap="round"/>
+      <path d="M-40,-176 L30,-156 L14,-120 L-48,-138 Z" fill="#f2c27a"/>
+    </g>
+    <!-- 一摞书，书签垂下来，末端一颗小星星 -->
+    <g transform="translate(150 772)">
+      <rect x="0" y="-22" width="130" height="22" rx="3" fill="#8a5a3a"/>
+      <rect x="10" y="-42" width="112" height="20" rx="3" fill="#5d6f8a"/>
+      <rect x="4" y="-60" width="120" height="18" rx="3" fill="#c98b5a"/>
+      <path d="M96,-60 L96,-18 L100,-12" stroke="#e3843f" stroke-width="3" fill="none"/>
+      <path class="anim breathe" d="M101.0,-13.0L102.9,-8.5L107.7,-8.2L104.0,-5.0L105.1,-0.3L101.0,-2.9L96.9,-0.3L98.0,-5.0L94.3,-8.2L99.1,-8.5Z" fill="#f6cf62"/>
+    </g>
+    
+    </g>
+  </svg>
+</svg>
