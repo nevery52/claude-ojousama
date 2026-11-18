@@ -12,11 +12,14 @@ const LOOK: ThemeSetArgs = {
 
 // Claude 在干活时为 true：书房停住不动
 let quiet = false
-// 寻耀说"我回来了"之后，到这个时刻之前台灯亮一下
-let welcomeUntil = 0
+// 寻耀说"我回来了"之后，台灯亮一下（3.5 秒）
+let welcoming = false
+// 现在是白天、晚上还是凌晨：提前算好放在这里，画书房时直接拿，不用再去问时间
+let time = timeOfDay(12)
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
+    time = timeOfDay(new Date(await $.clock.now()).getHours())
     const unpainted = palette.problems.find(line => line.startsWith("Desktop won't paint"))
     if (unpainted !== undefined) $.ui.toast(unpainted)
 
@@ -27,7 +30,14 @@ export const register: Register = on => {
     await $.command.register({ name: 'study-on', description: '打开大小姐的书房' })
 
     // 每分钟看一眼时间：白天、晚上、凌晨换不同的书房
-    $.clock.every(60_000, () => $.ui.invalidate('ui.render'))
+    // 只有真的换了时段才重画，平时不打扰
+    $.clock.every(60_000, async () => {
+      const nowTime = timeOfDay(new Date(await $.clock.now()).getHours())
+      if (nowTime !== time) {
+        time = nowTime
+        $.ui.invalidate('ui.render')
+      }
+    })
     return next(e)
   })
 
@@ -43,9 +53,12 @@ export const register: Register = on => {
 
   on('prompt.submit', async ($, e, next) => {
     if (!e.command && e.text.includes('我回来了')) {
-      welcomeUntil = (await $.clock.now()) + 3500
+      welcoming = true
       $.ui.invalidate('ui.render')
-      $.clock.after(3600, () => $.ui.invalidate('ui.render'))
+      $.clock.after(3500, () => {
+        welcoming = false
+        $.ui.invalidate('ui.render')
+      })
     }
     return next(e)
   })
@@ -66,15 +79,14 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('ui.render', { component: 'Backdrop' }, async ($, e, next) => {
+  // 画书房：不等任何东西，拿到就画（切换对话时少等一次来回）
+  on('ui.render', { component: 'Backdrop' }, ($, e, next) => {
     if (e.props.plugin !== $.plugin.name || e.props.scene !== SCENE) return next(e)
     if (e.surface !== 'desktop' && e.surface !== 'mobile') return next(e)
 
-    const now = await $.clock.now()
-    const hour = new Date(now).getHours()
     const { Svg } = $.ui.resolve(e)
     return Svg({
-      source: sceneSvg({ time: timeOfDay(hour), quiet, welcome: now < welcomeUntil }),
+      source: sceneSvg({ time, quiet, welcome: welcoming }),
       alt: '大小姐的书房：窗、书架上的大小姐玩偶、书桌和台灯',
     })
   })

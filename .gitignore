@@ -21,3 +21,6 @@ art/drafts/
 art/fullbody/
 art/skin_*/*_src.*
 art/private/
+
+# 做视频用的大工具（Python 环境、模型、下载的程序），太大，不进版本库
+video/tools/
